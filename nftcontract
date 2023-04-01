@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.9;
+
+import "@openzeppelin/contracts@4.8.0/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts@4.8.0/token/ERC721/extensions/ERC721Enumerable.sol";
+//import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts@4.8.0/security/Pausable.sol";
+import "@openzeppelin/contracts@4.8.0/access/Ownable.sol";
+import "@openzeppelin/contracts@4.8.0/utils/Counters.sol";
+
+contract Xhardhat is ERC721, ERC721Enumerable, Pausable, Ownable {
+    using Counters for Counters.Counter;
+
+    Counters.Counter private _tokenIdCounter;
+    uint256 maxSupply = 3500;
+    mapping(address => bool) public allowList;
+    mapping(address => uint256) private mintedPerWallet;
+    uint256 maxMintedAmount = 1;
+    uint private constant TOKENS_RESERVED = 25;
+    uint256 public constant MAX_MINT_PER_TX = 1;
+
+
+    bool public allowListMintOpen =false;
+    bool public publicListMintOpen = false;
+
+
+     constructor() ERC721("0xhardhat", "0xh") {}
+
+    function _baseURI() internal pure override returns (string memory) {
+        return "ipfs://QmToi13gN8SDy93fBv7rQMzRV9AbcJzkWt3fcsT5xbFt22/";
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    //our allowlist address arry
+
+    function setAllowlist(address [] calldata addresses) external onlyOwner {
+       for(uint256 i = 0; i < addresses.length; i++){
+               allowList[addresses[i]] = true;
+       }
+    }
+
+
+    function editWindow(  //editing the mintwindow
+        bool _publicListMintOpen,
+        bool _allowListMintOpen
+    ) external onlyOwner {
+        allowListMintOpen = _allowListMintOpen;
+        publicListMintOpen = _publicListMintOpen;
+
+    }
+
+     //allowlist variables
+    function allowListMint () public payable { //this contract is now payable
+        require(allowList[msg.sender], "You are not whitelisted");
+        require(mintedPerWallet[msg.sender] <= MAX_MINT_PER_TX, "you can mint once");
+        require(allowListMintOpen, "allowlistmint close");
+        require(msg.value == 0.001 ether, "insufficient eth");
+        internalMint();
+
+    }
+
+//publicmint variables
+    function publicMint() public payable{ //this contract is now payable
+        require(mintedPerWallet[msg.sender] <= MAX_MINT_PER_TX, "you can mint once");
+        require(publicListMintOpen, "public mint ended");
+        require(msg.value == 0.0044 ether, "not enough funds");
+        internalMint();
+
+    }
+
+    function internalMint() internal {
+
+         require(totalSupply() < maxSupply, "sold out");//limiting the supply minted
+         uint256 tokenId = _tokenIdCounter.current();
+        _tokenIdCounter.increment();
+        _safeMint(msg.sender, tokenId);
+    }
+
+    function withdraw(address _addr) external onlyOwner {
+        //gett the total balamces
+        uint256 balance = address(this).balance;
+        payable(_addr).transfer(balance);
+    }
+       // payable(_addr).transfer(balance);
+
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+        internal
+        whenNotPaused
+        override(ERC721, ERC721Enumerable)
+    {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    // The following functions are overrides required by Solidity.
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Enumerable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+}
